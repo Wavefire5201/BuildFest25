@@ -1,3 +1,5 @@
+# This file was used for testing purposes
+
 from openai import OpenAI
 import base64
 from io import BytesIO

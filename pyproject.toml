@@ -11,6 +11,7 @@ dependencies = [
     "numpy>=1.26.4",
     "openai>=1.64.0",
     "opencv-python>=4.10.0.84",
+    "pygame>=2.6.1",
     "python-dotenv>=1.0.1",
     "scrcpy-client>=0.4.7",
     "setuptools>=75.8.0",
