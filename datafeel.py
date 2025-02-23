@@ -129,3 +129,5 @@ sleep(0.5)
 device.registers.set_individual_led(6, 255, 255, 255)
 sleep(0.5)
 device.registers.set_individual_led(7, 255, 255, 255)
+
+device.registers.set_vibration_mode(VibrationMode.OFF)

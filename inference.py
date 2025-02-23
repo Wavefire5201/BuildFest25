@@ -1,8 +1,6 @@
 from openai import OpenAI
 import requests
-import base64
 import json
-import time
 import os
 from dotenv import load_dotenv
 
@@ -13,38 +11,40 @@ load_dotenv()
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 
-# ==============================
-# 1. Extract Text from Image
-# ==============================
-def extract_text_from_image(image_path):
-    with open(image_path, "rb") as image_file:
-        base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+def extract_text_from_image(b64_img: str) -> str:
+    # with open(image_path, "rb") as image_file:
+    #     base64_image = base64.b64encode(image_file.read()).decode("utf-8")
 
+    # print(b64_img)
     response = client.chat.completions.create(
-        model="gpt-4-turbo",
+        model="gpt-4o-mini",
         messages=[
             {
                 "role": "user",
                 "content": [
                     {
                         "type": "text",
-                        "text": "Extract and return the text from this image:",
+                        "text": "Extract and return the text from the book from this image. Only give me the text extracted from the book and nothing else. Try your best.",
                     },
                     {
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                        "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"},
                     },
                 ],
             }
         ],
-        max_tokens=1000,
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "text_extraction",
+                "schema": {"type": "string", "extracted_text": "string"},
+                "strict": True,
+            },
+        },
     )
     return response.choices[0].message.content
 
 
-# ==============================
-# 2. Chunk Text
-# ==============================
 def chunk_text(text):
     sentences = text.replace("\n", " ").split(". ")
     chunks = []
@@ -62,9 +62,6 @@ def chunk_text(text):
     return chunks
 
 
-# ==============================
-# 3. Analyze Mood & Generate RGB
-# ==============================
 def analyze_mood(chunk):
     prompt = f"""
     Analyze the mood of the following text and provide a temperature between -1 (very hot) and 1 (very cold).
@@ -76,7 +73,7 @@ def analyze_mood(chunk):
     """
 
     response = client.chat.completions.create(
-        model="gpt-4-turbo",  # Use the latest model
+        model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
@@ -84,9 +81,7 @@ def analyze_mood(chunk):
             },
             {"role": "user", "content": prompt},
         ],
-        response_format={
-            "type": "json_object"
-        },  # Ensure the response is in JSON format
+        response_format={"type": "json_object"},
     )
     response_text = response.choices[0].message.content
     try:
@@ -121,7 +116,7 @@ def convert_text_to_speech(text, filename):
 # ==============================
 # Main Function
 # ==============================
-def main(image_path):
+def run(image_path):
     text = extract_text_from_image(image_path)
     if not text:
         print("No text extracted.")
@@ -138,7 +133,3 @@ def main(image_path):
 
             output_filename = f"chunk_{idx}.mp3"
             convert_text_to_speech(chunk, output_filename)
-
-
-if __name__ == "__main__":
-    main("Casting_4XKEjyHtxs.png")
