@@ -42,34 +42,36 @@ def main():
 
 
 def run(image_path):
-    result = extract_text_from_image(image_path)
-    print(result)
-    print(type(result))
+    extracted_text_result = extract_text_from_image(image_path)
 
-    if not result:
+    if not extracted_text_result:
         print("No text extracted.")
         return
 
-    print("Extracted Text:\n", result)
+    print("Extracted Text:\n", extracted_text_result)
 
-    chunks = chunk_text(result["extracted_text"])
-    for idx, chunk in enumerate(chunks, start=1):
-        res = analyze_mood(chunk)
-        if res["temperature"] is not None and res["rgb"] is not None:
-            print(f"Chunk {idx}: {chunk}")
-            print(f"Temperature: {res['temperature']}, RGB: {res['rgb']}")
-            print(res)
-            device.activate_thermal_intensity_control(int(res["temperature"]))
-            device.play_frequency(float(res["vibration_frequency"]), 1.0)
-            device.set_led(
-                int(res["rgb"]["red"]),
-                int(res["rgb"]["green"]),
-                int(res["rgb"]["blue"]),
+    chunks = chunk_text(extracted_text_result.extracted_text)
+    for i, chunk in enumerate(chunks, start=1):
+        sentiment_data = analyze_mood(chunk)
+        if sentiment_data.temperature is not None and sentiment_data.rgb is not None:
+            print(f"Chunk {i}: {chunk}")
+            print(
+                f"Temperature: {sentiment_data.temperature}, RGB: {sentiment_data.rgb}"
             )
+            print(sentiment_data)
+            for dev in devices:
+                dev.activate_thermal_intensity_control(int(sentiment_data.temperature))
+                dev.play_frequency(float(sentiment_data.vibration_frequency), 1.0)
+                dev.set_led(
+                    sentiment_data.rgb.red,
+                    sentiment_data.rgb.green,
+                    sentiment_data.rgb.blue,
+                )
 
-            output_filename = f"chunk_{idx}.mp3"
-            convert_text_to_speech(chunk, output_filename)
-    device.disable_all_thermal()
+            output_filename = f"{i}.mp3"
+            kokoro_tts(chunk, output_filename)
+    for dev in devices:
+        dev.disable_all_thermal()
 
 
 if __name__ == "__main__":

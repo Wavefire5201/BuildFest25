@@ -1,15 +1,14 @@
 from openai import OpenAI
 from elevenlabs import ElevenLabs
 from elevenlabs import play
-import requests
 import json
 import os
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
-from typing import Annotated
+from pydantic import BaseModel
 
 load_dotenv()
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+kokoro = OpenAI(base_url="http://galileo:8880/v1", api_key="not-needed")
 el_client = ElevenLabs(api_key=os.environ.get("ELEVEN_LABS_API_KEY"))
 
 
@@ -17,11 +16,17 @@ class ExtractedText(BaseModel):
     extracted_text: str
     page_numbers: list[str]
 
+    def __str__(self):
+        return f"ExtractedText(extracted_text='{self.extracted_text}', page_numbers={self.page_numbers})"
+
 
 class RGB(BaseModel):
     red: int
     green: int
     blue: int
+
+    def __str__(self):
+        return f"RGB(red={self.red}, green={self.green}, blue={self.blue})"
 
 
 class SentimentAnalysis(BaseModel):
@@ -30,21 +35,29 @@ class SentimentAnalysis(BaseModel):
     vibration_frequency: float
     rgb: RGB
 
+    def __str__(self):
+        return (
+            f"SentimentAnalysis(temperature={self.temperature}, "
+            f"vibration_amplitude={self.vibration_amplitude}, "
+            f"vibration_frequency={self.vibration_frequency}, "
+            f"rgb={self.rgb})"
+        )
 
-def extract_text_from_image(base64_image: str):
+
+def extract_text_from_image(base64_image: str) -> ExtractedText:
     response = client.beta.chat.completions.parse(
         model="gpt-4o",
         messages=[
             {
                 "role": "system",
-                "content": "You are a helpful assistant that extracts text from books. Extract the text from the pages of the book specifically. If the text is cutoff, extract it as normal. Don't miss any text. Don't make up any sentences.",
+                "content": "You are a helpful assistant that extracts text from books. Extract the text from the pages of the book specifically. If the text is cutoff, extract it as normal. Don't miss any text. Don't make up any sentences. Don't include the title of the book. Don't include the author of the book.",
             },
             {
                 "role": "user",
                 "content": [
                     {
                         "type": "text",
-                        "text": "Extract the text from the pages of the book.",
+                        "text": "Extract the text from the pages of the book following the specifications.",
                     },
                     {
                         "type": "image_url",
@@ -56,7 +69,7 @@ def extract_text_from_image(base64_image: str):
         response_format=ExtractedText,
     )
 
-    return json.loads(response.choices[0].message.content)
+    return ExtractedText(**json.loads(response.choices[0].message.content))
 
 
 def chunk_text(text):
@@ -76,7 +89,7 @@ def chunk_text(text):
     return chunks
 
 
-def analyze_mood(chunk: str):
+def analyze_mood(chunk: str) -> SentimentAnalysis:
     prompt = f"""
     Analyze the mood of the following text and provide a valid response in the format below.
     Provide the temperature, RGB, and other parameters as needed.
@@ -100,7 +113,7 @@ def analyze_mood(chunk: str):
         ],
         response_format=SentimentAnalysis,
     )
-    return json.loads(response.choices[0].message.content)
+    return SentimentAnalysis(**json.loads(response.choices[0].message.content))
 
 
 def convert_text_to_speech(text, filename):
@@ -115,3 +128,14 @@ def convert_text_to_speech(text, filename):
             f.write(chunk)
 
     print(f"Audio saved: {filename}")
+
+
+def kokoro_tts(text, filename):
+    with kokoro.audio.speech.with_streaming_response.create(
+        model="kokoro",
+        voice="af_sky+af_bella",  # single or multiple voicepack combo
+        input=text,
+        speed=1.2,
+    ) as response:
+        response.stream_to_file(f"./audio/{filename}")
+        print(f"Audio saved (kokoro): {filename}")
