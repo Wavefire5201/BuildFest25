@@ -20,7 +20,7 @@
 **/*.pyo
 **/__pycache__/
 *.pt
-datafeel*
+datafeel*/
 runs
 samples
 README.txt
