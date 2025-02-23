@@ -16,9 +16,12 @@ def screen_capture() -> np.ndarray:
 def main():
     while True:
         frame = screen_capture()
-        result = detect_book(frame)
-        print(result)
-        print(result["predictions"][])
+        results = detect_book(frame)
+        print(results)
+        for result in results["predictions"]:
+            print(result)
+            if result["class"] == "book" and result["confidence"] > 80:
+                print("book detected!")
 
 
 if __name__ == "__main__":

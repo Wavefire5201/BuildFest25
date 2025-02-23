@@ -20,3 +20,8 @@
 **/*.pyo
 **/__pycache__/
 *.pt
+datafeel*
+runs
+samples
+README.txt
+setup.py
