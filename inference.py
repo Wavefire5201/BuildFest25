@@ -1,48 +1,62 @@
 from openai import OpenAI
+from elevenlabs import ElevenLabs
+from elevenlabs import play
 import requests
 import json
 import os
 from dotenv import load_dotenv
+from pydantic import BaseModel, Field
+from typing import Annotated
 
 load_dotenv()
-
-
-# Initialize the OpenAI client
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+el_client = ElevenLabs(api_key=os.environ.get("ELEVEN_LABS_API_KEY"))
 
 
-def extract_text_from_image(b64_img: str) -> str:
-    # with open(image_path, "rb") as image_file:
-    #     base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+class ExtractedText(BaseModel):
+    extracted_text: str
+    page_numbers: list[str]
 
-    # print(b64_img)
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
+
+class RGB(BaseModel):
+    red: int
+    green: int
+    blue: int
+
+
+class SentimentAnalysis(BaseModel):
+    temperature: float
+    vibration_amplitude: int
+    vibration_frequency: float
+    rgb: RGB
+
+
+def extract_text_from_image(base64_image: str):
+    response = client.beta.chat.completions.parse(
+        model="gpt-4o",
         messages=[
+            {
+                "role": "system",
+                "content": "You are a helpful assistant that extracts text from books. Extract the text from the pages of the book specifically. If the text is cutoff, extract it as normal. Don't miss any text. Don't make up any sentences.",
+            },
             {
                 "role": "user",
                 "content": [
                     {
                         "type": "text",
-                        "text": "Extract and return the text from the book from this image. Only give me the text extracted from the book and nothing else. Try your best.",
+                        "text": "Extract the text from the pages of the book.",
                     },
                     {
                         "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"},
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
                     },
                 ],
-            }
-        ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "text_extraction",
-                "schema": {"type": "string", "extracted_text": "string"},
-                "strict": True,
             },
-        },
+        ],
+        response_format=ExtractedText,
     )
-    return response.choices[0].message.content
+
+    return json.loads(response.choices[0].message.content)
 
 
 def chunk_text(text):
@@ -62,74 +76,42 @@ def chunk_text(text):
     return chunks
 
 
-def analyze_mood(chunk):
+def analyze_mood(chunk: str):
     prompt = f"""
-    Analyze the mood of the following text and provide a temperature between -1 (very hot) and 1 (very cold).
-    Then, convert the temperature into an RGB color in (R,G,B) format.
+    Analyze the mood of the following text and provide a valid response in the format below.
+    Provide the temperature, RGB, and other parameters as needed.
 
+    Temperature: -1.0 to 1.0 (-1 is hottest, 1 is coldest).
+    Vibration Amplitude (Intensity): 0 - 127.
+    Vibration Frequency: Typically ranges from 100 Hz to 250 Hz based on provided samples.
+    RGB: (0, 0, 0) to (255, 255, 255).
+    
     Text: "{chunk}"
-
-    Output format: {{ "temperature": <value>, "rgb": "(R,G,B)" }}
     """
 
-    response = client.chat.completions.create(
+    response = client.beta.chat.completions.parse(
         model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
-                "content": "You are a sentiment analysis assistant. Always respond in valid JSON format.",
+                "content": "You are a sentiment analysis assistant that helps people that are visually impaired feel immersive haptics based on text. The text is from a page of a book. Always respond in valid format.",
             },
             {"role": "user", "content": prompt},
         ],
-        response_format={"type": "json_object"},
+        response_format=SentimentAnalysis,
     )
-    response_text = response.choices[0].message.content
-    try:
-        analysis = json.loads(response_text)
-        return analysis["temperature"], analysis["rgb"]
-    except json.JSONDecodeError:
-        print("Error parsing JSON:", response_text)
-        return None, None
+    return json.loads(response.choices[0].message.content)
 
 
-# ==============================
-# 4. Convert Text to Speech (TTS)
-# ==============================
 def convert_text_to_speech(text, filename):
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{os.environ.get("ELEVEN_LABS_VOICE_ID")}"
-    headers = {"xi-api-key": os.environ.get("ELEVEN_LABS_API_KEY")}
-    payload = {
-        "text": text,
-        "model_id": "eleven_monolingual_v1",
-        "voice_settings": {"stability": 0.5, "similarity_boost": 0.8},
-    }
+    audio_generator = el_client.text_to_speech.convert(
+        text=text,
+        voice_id=os.environ.get("ELEVEN_LABS_VOICE_ID"),
+        model_id="eleven_multilingual_v2",
+        output_format="mp3_44100_128",
+    )
+    with open(f"./audio/{filename}", "wb") as f:
+        for chunk in audio_generator:
+            f.write(chunk)
 
-    response = requests.post(url, headers=headers, json=payload)
-    if response.status_code == 200:
-        with open(filename, "wb") as f:
-            f.write(response.content)
-        print(f"Audio saved: {filename}")
-    else:
-        print(f"Error generating TTS: {response.status_code}")
-
-
-# ==============================
-# Main Function
-# ==============================
-def run(image_path):
-    text = extract_text_from_image(image_path)
-    if not text:
-        print("No text extracted.")
-        return
-
-    print("Extracted Text:\n", text)
-
-    chunks = chunk_text(text)
-    for idx, chunk in enumerate(chunks, start=1):
-        temperature, rgb = analyze_mood(chunk)
-        if temperature is not None and rgb is not None:
-            print(f"Chunk {idx}: {chunk}")
-            print(f"Temperature: {temperature}, RGB: {rgb}")
-
-            output_filename = f"chunk_{idx}.mp3"
-            convert_text_to_speech(chunk, output_filename)
+    print(f"Audio saved: {filename}")

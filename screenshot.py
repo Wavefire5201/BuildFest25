@@ -1,3 +1,6 @@
+from openai import OpenAI
+import base64
+from io import BytesIO
 from PIL import ImageGrab, Image, ImageFilter
 import os
 from dotenv import load_dotenv
@@ -18,21 +21,18 @@ class ExtractedText(BaseModel):
 screenshot = ImageGrab.grab()
 
 # Apply image enhancements for better text clarity
-screenshot = screenshot.filter(ImageFilter.SHARPEN)  # Sharpen the image
-screenshot = screenshot.filter(ImageFilter.DETAIL)  # Enhance details
-screenshot = screenshot.filter(
-    ImageFilter.EDGE_ENHANCE
-)  # Enhance edges for better text definition
+# screenshot = screenshot.filter(ImageFilter.SHARPEN)  # Sharpen the image
+# screenshot = screenshot.filter(ImageFilter.DETAIL)  # Enhance details
+# screenshot = screenshot.filter(
+#     ImageFilter.EDGE_ENHANCE
+# )  # Enhance edges for better text definition
 screenshot.show()
-import base64
-from io import BytesIO
 
 buffered = BytesIO()
 screenshot.save(buffered, format="PNG")
 base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
 print(base64_image)
 
-from openai import OpenAI
 
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
@@ -56,6 +56,10 @@ response = client.beta.chat.completions.parse(
     response_format=ExtractedText,
 )
 
-extracted_json = response.choices[0].message.content
-print(response.choices[0].message)
-print(extracted_json)
+print(response.choices[0].message.parsed)
+print(type(response.choices[0].message.parsed))
+print("\n\n\n")
+print(response.choices[0].message.model_dump_json())
+# print("\n\n\n")
+# extracted_json = response.choices[0].message.content
+# print(extracted_json)

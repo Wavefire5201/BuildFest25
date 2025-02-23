@@ -3,6 +3,18 @@ from io import BytesIO
 import os
 import cv2
 import numpy as np
+from PIL import Image, ImageGrab, ImageFilter
+
+
+def capture_desktop_frame():
+    screenshot = ImageGrab.grab()
+    # screenshot = screenshot.filter(ImageFilter.SHARPEN)
+    # screenshot = screenshot.filter(ImageFilter.DETAIL)
+    # screenshot = screenshot.filter(ImageFilter.EDGE_ENHANCE)
+    screenshot.show()
+    buffered = BytesIO()
+    screenshot.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 
 def image_to_base64(image_path):

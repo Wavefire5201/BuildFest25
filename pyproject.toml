@@ -3,16 +3,19 @@ name = "buildfest25"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "datafeel",
+    "elevenlabs>=1.51.0",
     "inference-sdk>=0.12.0",
     "numpy>=1.26.4",
     "openai>=1.64.0",
     "opencv-python>=4.10.0.84",
     "python-dotenv>=1.0.1",
+    "scrcpy-client>=0.4.7",
+    "setuptools>=75.8.0",
     "ultralytics>=8.3.23",
 ]
 
 [tool.uv.sources]
-datafeel = { path = "../Downloads/devkit-samples/Python" }
+datafeel = { path = "../devkit-samples-main/Python" }
